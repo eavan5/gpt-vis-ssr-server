@@ -13,30 +13,41 @@ const IMAGES_DIR = './images';
 const S3_CONFIG = {
   accessKeyId: process.env.AWS_ACCESS_KEY_ID,
   secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-  region: process.env.AWS_REGION,
+  region: process.env.AWS_REGION || 'us-east-1',
   bucketName: process.env.S3_BUCKET_NAME,
-  customDomain: process.env.S3_CUSTOM_DOMAIN
+  customDomain: process.env.S3_CUSTOM_DOMAIN,
+  endpoint: process.env.S3_ENDPOINT, // For MinIO or custom S3 endpoints
+  forcePathStyle: process.env.S3_FORCE_PATH_STYLE === 'true' // For MinIO compatibility
 };
 
 // Check if S3 is configured
 const isS3Configured = () => {
   return S3_CONFIG.accessKeyId && 
          S3_CONFIG.secretAccessKey && 
-         S3_CONFIG.region && 
-         S3_CONFIG.bucketName;
+         S3_CONFIG.bucketName; // Region is optional for MinIO
 };
 
 // Initialize S3 client if configured
 let s3Client = null;
 if (isS3Configured()) {
-  s3Client = new S3Client({
+  const clientConfig = {
     region: S3_CONFIG.region,
     credentials: {
       accessKeyId: S3_CONFIG.accessKeyId,
       secretAccessKey: S3_CONFIG.secretAccessKey
     }
-  });
-  console.log('✅ S3 storage configured');
+  };
+
+  // Add endpoint for MinIO or custom S3 services
+  if (S3_CONFIG.endpoint) {
+    clientConfig.endpoint = S3_CONFIG.endpoint;
+    clientConfig.forcePathStyle = S3_CONFIG.forcePathStyle;
+  }
+
+  s3Client = new S3Client(clientConfig);
+  
+  const serviceType = S3_CONFIG.endpoint ? 'MinIO/Custom S3' : 'AWS S3';
+  console.log(`✅ ${serviceType} storage configured`);
 } else {
   console.log('📁 Using local storage (S3 not configured)');
 }
@@ -58,10 +69,20 @@ async function uploadToS3(buffer, filename) {
 
   await s3Client.send(command);
 
-  // Return URL based on custom domain or default S3 URL
+  // Return URL based on configuration
   if (S3_CONFIG.customDomain) {
+    // Custom domain (CDN or custom endpoint)
     return `${S3_CONFIG.customDomain}/${key}`;
+  } else if (S3_CONFIG.endpoint) {
+    // MinIO or custom S3 endpoint
+    const endpointUrl = new URL(S3_CONFIG.endpoint);
+    if (S3_CONFIG.forcePathStyle) {
+      return `${S3_CONFIG.endpoint}/${S3_CONFIG.bucketName}/${key}`;
+    } else {
+      return `${endpointUrl.protocol}//${S3_CONFIG.bucketName}.${endpointUrl.host}/${key}`;
+    }
   } else {
+    // Standard AWS S3 URL
     return `https://${S3_CONFIG.bucketName}.s3.${S3_CONFIG.region}.amazonaws.com/${key}`;
   }
 }
@@ -173,7 +194,10 @@ app.get('/health', (_, res) => {
     s3Config: isS3Configured() ? {
       region: S3_CONFIG.region,
       bucket: S3_CONFIG.bucketName,
-      customDomain: S3_CONFIG.customDomain || 'default'
+      customDomain: S3_CONFIG.customDomain || null,
+      endpoint: S3_CONFIG.endpoint || null,
+      forcePathStyle: S3_CONFIG.forcePathStyle || false,
+      serviceType: S3_CONFIG.endpoint ? 'MinIO/Custom' : 'AWS S3'
     } : null
   };
   
@@ -208,9 +232,18 @@ async function startServer() {
       console.log(`📊 Chart API: POST http://localhost:${PORT}/api/gpt-vis`);
       
       if (isS3Configured()) {
-        console.log(`☁️  S3 Storage: ${S3_CONFIG.bucketName} (${S3_CONFIG.region})`);
+        const serviceType = S3_CONFIG.endpoint ? 'MinIO/Custom S3' : 'AWS S3';
+        console.log(`☁️  ${serviceType} Storage: ${S3_CONFIG.bucketName}`);
+        
+        if (S3_CONFIG.endpoint) {
+          console.log(`🔗 Endpoint: ${S3_CONFIG.endpoint}`);
+          console.log(`📁 Path Style: ${S3_CONFIG.forcePathStyle ? 'Enabled (MinIO)' : 'Disabled'}`);
+        } else {
+          console.log(`🌍 Region: ${S3_CONFIG.region}`);
+        }
+        
         if (S3_CONFIG.customDomain) {
-          console.log(`🌍 Custom Domain: ${S3_CONFIG.customDomain}`);
+          console.log(`🌐 Custom Domain: ${S3_CONFIG.customDomain}`);
         }
       } else {
         console.log(`📁 Local Storage: ${path.resolve(IMAGES_DIR)}`);
