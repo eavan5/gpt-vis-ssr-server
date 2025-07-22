@@ -33,17 +33,27 @@
 git clone https://github.com/eavan5/gpt-vis-ssr-server.git
 cd gpt-vis-ssr-server
 
-# 2. 构建并运行 Docker 容器
+# 2. 构建 Docker 镜像
 docker build -t gpt-vis-ssr-server .
-docker run -d --name gpt-vis-server -p 3000:3000 gpt-vis-ssr-server
 
-# 3. 测试服务
+# 3. 运行容器（本地存储模式）
+docker run -d \
+  --name gpt-vis-server \
+  -p 3000:3000 \
+  -v $(pwd)/images:/app/images \
+  gpt-vis-ssr-server
+
+# 4. 测试服务
 npm test
 ```
 
 **访问地址：**
 - 服务：http://localhost:3000
 - 健康检查：http://localhost:3000/health
+
+**说明：**
+- `-v $(pwd)/images:/app/images` 将当前目录下的 `images` 文件夹映射到容器内，用于本地存储
+- 如果需要 S3 存储，创建 `.env` 文件后使用 `--env-file .env` 参数
 
 ### 本地开发
 
@@ -154,20 +164,31 @@ S3_BUCKET_NAME=charts
 
 ## 🐳 Docker 部署
 
-### 构建和运行
+### 快速部署
 
+**本地存储模式（推荐新手）：**
 ```bash
 # 构建镜像
 docker build -t gpt-vis-ssr-server .
 
-# 使用本地存储运行
+# 运行容器 - 本地存储
 docker run -d \
   --name gpt-vis-server \
   -p 3000:3000 \
   -v $(pwd)/images:/app/images \
   gpt-vis-ssr-server
 
-# 使用 S3 配置运行
+# 查看生成的图片
+ls -la images/
+```
+
+**S3 存储模式：**
+```bash
+# 1. 创建 .env 文件（参考 .env.example）
+cp .env.example .env
+# 编辑 .env 文件，填入 S3 配置信息
+
+# 2. 运行容器 - S3 存储
 docker run -d \
   --name gpt-vis-server \
   -p 3000:3000 \
