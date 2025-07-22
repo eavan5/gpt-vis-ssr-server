@@ -2,6 +2,42 @@
 
 基于 GPT-Vis SSR 包的 Node.js Express 图表图片生成服务，支持本地存储、AWS S3 和 MinIO 云存储。
 
+## 快速开始
+
+> **❗ 安装遇到问题？** 查看详细的 [安装指南](./INSTALL.md)
+
+### 方式一：使用 Docker（推荐，避免依赖问题）
+
+```bash
+# 1. 克隆项目
+git clone <your-repo-url>
+cd gpt-vis-ssr-server
+
+# 2. 给脚本执行权限
+chmod +x docker-run.sh
+
+# 3. 启动服务
+./docker-run.sh local    # 本地存储
+./docker-run.sh minio    # MinIO 存储
+
+# 4. 测试服务
+npm run docker:test
+```
+
+### 方式二：本地开发
+
+```bash
+# 1. 安装系统依赖（仅 macOS）
+xcode-select --install
+brew install pkg-config cairo pango libpng jpeg giflib librsvg pixman
+
+# 2. 安装项目依赖
+npm install
+
+# 3. 启动服务
+npm start
+```
+
 ## 安装
 
 ```bash
@@ -50,20 +86,200 @@ cp .env.example .env
 
 ## 使用方法
 
-### 启动服务器
+### 本地开发
+
+#### 启动服务器
 ```bash
 npm start
 ```
 
-### 开发模式
+#### 开发模式
 ```bash
 npm run dev
 ```
 
-### 测试服务器
+#### 测试服务器
 ```bash
 # 先启动服务器，然后在另一个终端运行：
 npm test
+```
+
+### Docker 部署
+
+我们提供了完整的 Docker 配置，支持本地存储和 MinIO 存储模式。
+
+#### 快速启动（推荐）
+
+使用提供的脚本快速启动：
+
+```bash
+# 给脚本执行权限
+chmod +x docker-run.sh
+
+# 本地存储模式（默认路径：./images）
+./docker-run.sh local
+
+# 本地存储模式（自定义路径）
+./docker-run.sh local /home/user/my-charts
+
+# MinIO 存储模式（自动配置 MinIO）
+./docker-run.sh minio
+
+# MinIO 模式（自定义备用路径）
+./docker-run.sh minio ~/backup-images
+
+# 使用环境变量指定路径
+IMAGES_DIR=/custom/path ./docker-run.sh local
+
+# 查看服务状态
+./docker-run.sh logs
+
+# 停止服务
+./docker-run.sh stop
+```
+
+#### 手动 Docker 操作
+
+```bash
+# 构建镜像
+docker build -t gpt-vis-ssr-server .
+
+# 本地存储模式（默认路径）
+docker-compose -f docker-compose.local.yml up -d
+
+# 本地存储模式（自定义路径）
+IMAGES_DIR=/custom/path docker-compose -f docker-compose.local.yml up -d
+
+# 完整模式（包含 MinIO）
+docker-compose up -d
+
+# 完整模式（自定义备用路径）
+IMAGES_DIR=/custom/path docker-compose up -d
+
+# 停止服务
+docker-compose down
+```
+
+#### 直接使用 Docker Run
+
+如果你只需要运行应用服务而不需要 MinIO：
+
+```bash
+# 构建镜像
+docker build -t gpt-vis-ssr-server .
+
+# 本地存储模式
+docker run -d \
+  --name gpt-vis-server \
+  -p 3000:3000 \
+  -v /your/local/images:/app/images \
+  gpt-vis-ssr-server
+
+# 使用环境变量文件
+docker run -d \
+  --name gpt-vis-server \
+  -p 3000:3000 \
+  -v /your/local/images:/app/images \
+  --env-file .env \
+  gpt-vis-ssr-server
+
+# 手动指定 S3 环境变量
+docker run -d \
+  --name gpt-vis-server \
+  -p 3000:3000 \
+  -v /your/local/images:/app/images \
+  -e PORT=3000 \
+  -e NODE_ENV=production \
+  -e AWS_ACCESS_KEY_ID=your_access_key \
+  -e AWS_SECRET_ACCESS_KEY=your_secret_key \
+  -e S3_BUCKET_NAME=your-bucket-name \
+  -e AWS_REGION=us-east-1 \
+  gpt-vis-ssr-server
+
+# MinIO 配置示例
+docker run -d \
+  --name gpt-vis-server \
+  -p 3000:3000 \
+  -v /your/local/images:/app/images \
+  -e AWS_ACCESS_KEY_ID=minioadmin \
+  -e AWS_SECRET_ACCESS_KEY=minioadmin \
+  -e S3_ENDPOINT=http://your-minio-host:9000 \
+  -e S3_FORCE_PATH_STYLE=true \
+  -e S3_BUCKET_NAME=charts \
+  gpt-vis-ssr-server
+
+# 停止并删除容器
+docker stop gpt-vis-server
+docker rm gpt-vis-server
+```
+
+#### Docker 容器管理
+
+```bash
+# 查看运行状态
+docker ps
+
+# 查看日志
+docker logs gpt-vis-server
+
+# 实时跟踪日志
+docker logs -f gpt-vis-server
+
+# 进入容器
+docker exec -it gpt-vis-server sh
+
+# 重启容器
+docker restart gpt-vis-server
+```
+
+#### 使用 NPM 脚本
+
+```bash
+# 构建 Docker 镜像
+npm run docker:build
+
+# 本地存储模式（默认路径）
+npm run docker:local
+
+# 本地存储模式（自定义路径）
+IMAGES_DIR=/custom/path npm run docker:local
+
+# 完整模式（包含 MinIO）
+npm run docker:full
+
+# 完整模式（自定义备用路径）
+IMAGES_DIR=/custom/path npm run docker:full
+
+# 查看日志
+npm run docker:logs
+
+# 测试 Docker 服务
+npm run docker:test
+
+# 停止所有服务
+npm run docker:stop
+```
+
+#### Docker 环境变量
+
+通过环境变量文件配置：
+
+```bash
+# 创建环境变量文件
+cp .env.example .env
+
+# 编辑配置
+vim .env
+```
+
+或在 docker-compose.yml 中直接配置环境变量：
+
+```yaml
+environment:
+  - AWS_ACCESS_KEY_ID=your_key
+  - AWS_SECRET_ACCESS_KEY=your_secret
+  - S3_BUCKET_NAME=your_bucket
+  # 其他配置...
 ```
 
 ## 功能测试
@@ -262,19 +478,88 @@ gpt-vis-ssr-server/
 ├── package.json           # 项目配置和依赖
 ├── .env.example          # 环境变量模板
 ├── .gitignore            # Git 忽略文件
-├── test-server.js        # 测试脚本
+├── .dockerignore         # Docker 忽略文件
+├── Dockerfile            # Docker 镜像构建文件
+├── docker-compose.yml    # 完整服务编排（含 MinIO）
+├── docker-compose.local.yml  # 本地存储模式
+├── docker-run.sh         # Docker 快速启动脚本 ⭐
+├── docker-test.sh        # Docker 环境测试脚本
+├── test-server.js        # 本地测试脚本
 ├── example-request.json  # 请求示例
-├── README.md             # 项目文档
+├── README.md             # 项目文档（中文）
+├── README_CN.md          # 详细中文文档
+├── DOCKER-MAPPING-EXAMPLES.md  # Docker 映射路径示例 🆕
 └── images/               # 本地图片存储目录（自动创建）
 ```
 
+## Docker 服务说明
+
+### 服务访问地址
+
+**本地存储模式:**
+- 图片服务: http://localhost:3000
+- 健康检查: http://localhost:3000/health
+
+**MinIO 模式:**
+- 图片服务: http://localhost:3000
+- 健康检查: http://localhost:3000/health
+- MinIO Console: http://localhost:9001
+- MinIO API: http://localhost:9000
+
+### Docker 优势
+
+1. **环境一致性**: 避免本地环境差异
+2. **快速部署**: 一键启动完整服务
+3. **自动配置**: MinIO 自动创建存储桶和权限
+4. **健康检查**: 自动监控服务状态
+5. **数据持久化**: 数据卷保持数据不丢失
+6. **灵活映射**: 支持自定义图片存储路径
+7. **多环境支持**: 轻松切换本地存储和云存储
+
 ## 快速开始
 
-1. **克隆或下载项目**
-2. **安装依赖**: `npm install`
-3. **配置环境变量**（可选）: `cp .env.example .env`
-4. **启动服务**: `npm start`
-5. **测试功能**: `npm test`
+### 方式一：Docker 部署（推荐）
+
+```bash
+# 1. 克隆或下载项目
+git clone <your-repo-url>
+cd gpt-vis-ssr-server
+
+# 2. 给脚本执行权限
+chmod +x docker-run.sh
+
+# 3. 启动服务（本地存储，默认路径）
+./docker-run.sh local
+
+# 或启动服务（本地存储，自定义路径）
+./docker-run.sh local /home/user/my-charts
+
+# 或启动完整服务（包含 MinIO）
+./docker-run.sh minio
+
+# 4. 测试服务
+npm run docker:test
+```
+
+### 方式二：本地开发
+
+```bash
+# 1. 克隆或下载项目
+git clone <your-repo-url>
+cd gpt-vis-ssr-server
+
+# 2. 安装依赖
+npm install
+
+# 3. 配置环境变量（可选）
+cp .env.example .env
+
+# 4. 启动服务
+npm start
+
+# 5. 测试功能
+npm test
+```
 
 ## 示例请求
 
